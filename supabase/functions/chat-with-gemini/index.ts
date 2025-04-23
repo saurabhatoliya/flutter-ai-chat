@@ -1,9 +1,8 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const apiKey = Deno.env.get('GEMINI_API_KEY')!;
-const genAIBaseUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent";
+const genAIBaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
