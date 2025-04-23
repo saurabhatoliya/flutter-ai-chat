@@ -1,8 +1,8 @@
-
 import React, { useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
+import VoiceRecorder from "./VoiceRecorder";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -29,6 +29,10 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
     }
   };
 
+  const handleTranscription = (text: string) => {
+    setMessage(text);
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -37,20 +41,22 @@ export default function ChatInput({ onSendMessage, isLoading }: ChatInputProps) 
       <div className="relative flex items-center">
         <Textarea
           placeholder="Message Gemini..."
-          className="pr-12 resize-none min-h-12 max-h-36"
+          className="pr-24 resize-none min-h-12 max-h-36"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
-        <Button
-          type="submit"
-          size="icon"
-          className="absolute right-2 top-1/2 transform -translate-y-1/2"
-          disabled={!message.trim() || isLoading}
-        >
-          <Send className="h-5 w-5" />
-        </Button>
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-2">
+          <VoiceRecorder onTranscription={handleTranscription} isLoading={isLoading} />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!message.trim() || isLoading}
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
       <div className="text-xs text-muted-foreground text-center">
         Gemini may display inaccurate info, including about people, places, or facts
