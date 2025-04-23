@@ -27,30 +27,29 @@ export default function VoiceRecorder({ onTranscription, isLoading }: VoiceRecor
   
   const startRecording = async () => {
     try {
-      // Request audio permission
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
-          noiseSuppression: true
+          noiseSuppression: true,
+          channelCount: 1,
+          sampleRate: 16000
         } 
       });
       
-      // Create and configure MediaRecorder
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType: 'audio/webm'
       });
       chunksRef.current = [];
       
-      // Add data handler
       mediaRecorderRef.current.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
       };
       
-      // Add stop handler
       mediaRecorderRef.current.onstop = async () => {
         setIsProcessing(true);
+        toast.info('Processing audio...');
         
         try {
           const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
@@ -58,16 +57,14 @@ export default function VoiceRecorder({ onTranscription, isLoading }: VoiceRecor
           
           reader.onloadend = async () => {
             try {
-              // Extract base64 data
               const base64Audio = (reader.result as string).split(',')[1];
               
-              // Call Supabase edge function
               const { data, error } = await supabase.functions.invoke('speech-to-text', {
                 body: { audio: base64Audio }
               });
               
               if (error) {
-                console.error('Supabase function error:', error);
+                console.error('Speech-to-text error:', error);
                 throw error;
               }
               
@@ -99,7 +96,6 @@ export default function VoiceRecorder({ onTranscription, isLoading }: VoiceRecor
         }
       };
       
-      // Start recording
       mediaRecorderRef.current.start();
       setIsRecording(true);
       toast.info('Recording started. Speak now...');
@@ -114,7 +110,6 @@ export default function VoiceRecorder({ onTranscription, isLoading }: VoiceRecor
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
-      toast.info('Processing your speech...');
     }
   };
   

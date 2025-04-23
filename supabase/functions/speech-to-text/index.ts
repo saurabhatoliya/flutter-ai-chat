@@ -23,31 +23,78 @@ serve(async (req) => {
     // Convert base64 to binary
     const binaryAudio = Uint8Array.from(atob(audio), c => c.charCodeAt(0))
 
-    // Log request info for debugging
-    console.log(`Processing ${binaryAudio.length} bytes of audio data`)
-
-    const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-2", {
+    // Upload audio to AssemblyAI
+    const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${Deno.env.get('DEEPGRAM_API_KEY')}`,
-        'Content-Type': 'audio/webm',
+        'Authorization': Deno.env.get('ASSEMBLY_AI_KEY') || '',
+        'Content-Type': 'application/octet-stream',
       },
       body: binaryAudio
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`Deepgram API error: ${errorText}`)
-      throw new Error(`Deepgram API error: ${errorText}`)
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
+      console.error(`AssemblyAI upload error: ${errorText}`)
+      throw new Error(`AssemblyAI upload error: ${errorText}`)
     }
 
-    const result = await response.json()
-    const transcription = result.results?.channels[0]?.alternatives[0]?.transcript || ''
-    
-    console.log(`Transcription result: "${transcription}"`)
+    const { upload_url } = await uploadResponse.json()
+
+    // Start transcription
+    const transcribeResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST',
+      headers: {
+        'Authorization': Deno.env.get('ASSEMBLY_AI_KEY') || '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audio_url: upload_url,
+        language_code: 'en'
+      })
+    })
+
+    if (!transcribeResponse.ok) {
+      const errorText = await transcribeResponse.text()
+      console.error(`AssemblyAI transcription error: ${errorText}`)
+      throw new Error(`AssemblyAI transcription error: ${errorText}`)
+    }
+
+    const transcription = await transcribeResponse.json()
+
+    // Poll for transcription completion
+    let result
+    while (true) {
+      const pollResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcription.id}`, {
+        headers: {
+          'Authorization': Deno.env.get('ASSEMBLY_AI_KEY') || '',
+        },
+      })
+
+      if (!pollResponse.ok) {
+        const errorText = await pollResponse.text()
+        console.error(`AssemblyAI polling error: ${errorText}`)
+        throw new Error(`AssemblyAI polling error: ${errorText}`)
+      }
+
+      result = await pollResponse.json()
+
+      if (result.status === 'completed' || result.status === 'error') {
+        break
+      }
+
+      // Wait before polling again
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    if (result.status === 'error') {
+      throw new Error(`Transcription failed: ${result.error}`)
+    }
+
+    console.log(`Transcription result: "${result.text}"`)
 
     return new Response(
-      JSON.stringify({ text: transcription }),
+      JSON.stringify({ text: result.text || '' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
