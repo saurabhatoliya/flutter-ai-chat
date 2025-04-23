@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -22,6 +23,9 @@ serve(async (req) => {
     // Convert base64 to binary
     const binaryAudio = Uint8Array.from(atob(audio), c => c.charCodeAt(0))
 
+    // Log request info for debugging
+    console.log(`Processing ${binaryAudio.length} bytes of audio data`)
+
     const response = await fetch("https://api.deepgram.com/v1/listen?model=nova-2", {
       method: 'POST',
       headers: {
@@ -32,11 +36,15 @@ serve(async (req) => {
     })
 
     if (!response.ok) {
-      throw new Error(`Deepgram API error: ${await response.text()}`)
+      const errorText = await response.text()
+      console.error(`Deepgram API error: ${errorText}`)
+      throw new Error(`Deepgram API error: ${errorText}`)
     }
 
     const result = await response.json()
     const transcription = result.results?.channels[0]?.alternatives[0]?.transcript || ''
+    
+    console.log(`Transcription result: "${transcription}"`)
 
     return new Response(
       JSON.stringify({ text: transcription }),
